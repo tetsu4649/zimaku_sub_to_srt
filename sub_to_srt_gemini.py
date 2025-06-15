@@ -22,15 +22,15 @@ class TranslationResult:
 
 class SubToSrtGeminiTranslator:
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv('GEMINI_API_KEY')
+        self.api_key = api_key or os.getenv('GEMINI_API_KEY1')
         if not self.api_key:
             raise ValueError(
-                "Gemini API key is required. Set GEMINI_API_KEY environment variable "
+                "Gemini API key is required. Set GEMINI_API_KEY1 environment variable "
                 "or pass api_key parameter."
             )
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
         
         # Language mappings
         self.languages = {
@@ -421,21 +421,183 @@ class SubToSrtGeminiTranslator:
         
         print(f"\nTranslation completed: {successful_translations}/{len(valid_languages)} languages successful")
 
+def interactive_mode():
+    """日本語対話モード"""
+    print("=" * 50)
+    print("         字幕翻訳プログラム (Gemini 2.5)")
+    print("=" * 50)
+    
+    # ファイル選択
+    while True:
+        input_file = input("\n翻訳したいSUBファイルのパスを入力してください: ").strip().strip('"')
+        if os.path.exists(input_file):
+            break
+        print("❌ ファイルが見つかりません。正しいパスを入力してください。")
+    
+    print(f"✅ ファイル: {input_file}")
+    
+    # 言語選択
+    print("\n翻訳言語を選択してください:")
+    print("0. すべて翻訳 (英語 → 韓国語 → 中国語繁体字)")
+    print("1. 英語 (English)")
+    print("2. 韓国語 (Korean)")
+    print("3. 中国語繁体字 (Traditional Chinese)")
+    print("4. 中国語簡体字 (Simplified Chinese)")
+    print("5. スペイン語 (Spanish)")
+    print("6. フランス語 (French)")
+    print("7. ドイツ語 (German)")
+    print("8. カスタム選択 (複数言語)")
+    
+    while True:
+        try:
+            choice = input("\n番号を入力してください: ").strip()
+            
+            if choice == "0":
+                target_languages = ['en', 'ko', 'zh-tw']
+                print("✅ すべて翻訳を選択しました (英語, 韓国語, 中国語繁体字)")
+                break
+            elif choice == "1":
+                target_languages = ['en']
+                print("✅ 英語を選択しました")
+                break
+            elif choice == "2":
+                target_languages = ['ko']
+                print("✅ 韓国語を選択しました")
+                break
+            elif choice == "3":
+                target_languages = ['zh-tw']
+                print("✅ 中国語繁体字を選択しました")
+                break
+            elif choice == "4":
+                target_languages = ['zh-cn']
+                print("✅ 中国語簡体字を選択しました")
+                break
+            elif choice == "5":
+                target_languages = ['es']
+                print("✅ スペイン語を選択しました")
+                break
+            elif choice == "6":
+                target_languages = ['fr']
+                print("✅ フランス語を選択しました")
+                break
+            elif choice == "7":
+                target_languages = ['de']
+                print("✅ ドイツ語を選択しました")
+                break
+            elif choice == "8":
+                print("\nカスタム選択:")
+                print("言語コードをカンマ区切りで入力してください")
+                print("例: en,ko,zh-tw")
+                lang_input = input("言語コード: ").strip()
+                target_languages = [lang.strip() for lang in lang_input.split(',')]
+                print(f"✅ カスタム選択: {', '.join(target_languages)}")
+                break
+            else:
+                print("❌ 無効な選択です。0-8の番号を入力してください。")
+        except KeyboardInterrupt:
+            print("\n\n翻訳を中止しました。")
+            return
+    
+    # 翻訳モード選択
+    print("\n翻訳モードを選択してください:")
+    print("1. 順次翻訳 (安全・推奨)")
+    print("2. 同時翻訳 (高速・リスクあり)")
+    
+    while True:
+        mode_choice = input("番号を入力してください (デフォルト: 1): ").strip()
+        if mode_choice == "" or mode_choice == "1":
+            mode = "batch"
+            print("✅ 順次翻訳モードを選択しました")
+            break
+        elif mode_choice == "2":
+            mode = "simultaneous"
+            print("✅ 同時翻訳モードを選択しました")
+            break
+        else:
+            print("❌ 1または2を入力してください。")
+    
+    # 翻訳開始
+    print("\n" + "=" * 50)
+    print("翻訳を開始します...")
+    print("=" * 50)
+    
+    try:
+        translator = SubToSrtGeminiTranslator()
+        translator.convert_sub_to_srt(input_file, target_languages, mode)
+        print("\n🎉 すべての翻訳が完了しました！")
+    except ValueError as e:
+        print(f"\n❌ エラー: {e}")
+        print("Gemini APIキーを設定してください:")
+        print("  setx GEMINI_API_KEY1 \"your_api_key_here\"")
+    except Exception as e:
+        print(f"\n❌ 予期せぬエラー: {e}")
+
 def main():
+    # ドラッグ&ドロップ対応 - ファイルパスが引数として渡された場合
+    if len(sys.argv) == 2 and sys.argv[1].endswith('.sub'):
+        print("=" * 50)
+        print("    ドラッグ&ドロップモードで起動しました")
+        print("=" * 50)
+        input_file = sys.argv[1]
+        
+        if not os.path.exists(input_file):
+            print(f"❌ ファイルが見つかりません: {input_file}")
+            return
+        
+        print(f"✅ ファイル: {input_file}")
+        
+        # 言語選択のみ実行
+        print("\n翻訳言語を選択してください:")
+        print("0. すべて翻訳 (英語 → 韓国語 → 中国語繁体字)")
+        print("1. 英語のみ")
+        print("2. カスタム選択")
+        
+        choice = input("番号を入力してください: ").strip()
+        
+        if choice == "0":
+            target_languages = ['en', 'ko', 'zh-tw']
+            print("✅ すべて翻訳を選択しました")
+        elif choice == "1":
+            target_languages = ['en']
+            print("✅ 英語のみを選択しました")
+        else:
+            lang_input = input("言語コード (例: en,ko): ").strip()
+            target_languages = [lang.strip() for lang in lang_input.split(',')]
+            print(f"✅ カスタム選択: {', '.join(target_languages)}")
+        
+        print("\n翻訳を開始します...")
+        try:
+            translator = SubToSrtGeminiTranslator()
+            translator.convert_sub_to_srt(input_file, target_languages, 'batch')
+            print("\n🎉 翻訳完了！")
+        except Exception as e:
+            print(f"\n❌ エラー: {e}")
+        
+        input("\nEnterキーを押して終了...")
+        return
+    
+    # 引数なしの場合は対話モード
+    if len(sys.argv) == 1:
+        interactive_mode()
+        return
+    
+    # 従来のコマンドライン引数モード
     if len(sys.argv) < 3:
-        print("Usage: python sub_to_srt_gemini.py <input_file.sub> <languages> [options]")
-        print("Languages: en,ko,zh-tw (comma-separated)")
-        print("Options:")
-        print("  --mode [batch|simultaneous]  Translation mode (default: batch)")
-        print("  --output-dir <directory>     Output directory")
-        print("  --api-key <key>             Gemini API key")
-        print("\nExamples:")
+        print("=" * 50)
+        print("          字幕翻訳プログラム")
+        print("=" * 50)
+        print("使用方法:")
+        print("  1. 対話モード: python sub_to_srt_gemini.py")
+        print("  2. ドラッグ&ドロップ: SUBファイルをプログラムにドロップ")
+        print("  3. コマンドライン: python sub_to_srt_gemini.py <file.sub> <languages>")
+        print()
+        print("コマンドライン例:")
         print("  python sub_to_srt_gemini.py sample.sub en,ko,zh-tw")
         print("  python sub_to_srt_gemini.py sample.sub en --mode simultaneous")
-        print("  python sub_to_srt_gemini.py sample.sub en,ko --output-dir ./output")
-        print("\nSupported languages:")
-        print("  en: English, ko: Korean, zh-tw: Traditional Chinese")
-        print("  zh-cn: Simplified Chinese, es: Spanish, fr: French, de: German")
+        print()
+        print("対話モードを開始しますか？ (y/n)")
+        if input().lower().startswith('y'):
+            interactive_mode()
         return
     
     input_file = sys.argv[1]
@@ -467,7 +629,7 @@ def main():
     except ValueError as e:
         print(f"Error: {e}")
         print("Please set your Gemini API key:")
-        print("  export GEMINI_API_KEY='AIzaSyBrxql1gZ4kAP13ewqXPm0QwK-9LNzqSGY'")
+        print("  setx GEMINI_API_KEY1 \"your_api_key_here\"")
         print("Or use --api-key option")
     except Exception as e:
         print(f"Unexpected error: {e}")
